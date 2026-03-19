@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # The Message Broker for async verification
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"   # Communication port
+      - "15672:15672" # Web UI (http://localhost:15672)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Central Node Discovery (gRPC)
+  registry:
+    build: .
+    command: python src/registry.py
+    ports:
+      - "50051:50051"
+    depends_on:
+      - rabbitmq
+
+  # Peer Node 1 (You will duplicate this for node2, node3 later)
+  node1:
+    build: .
+    command: python src/node.py --id 1 --port 50052
+    volumes:
+      - ./node_data/node1:/app/data  # Saves data locally so it survives restarts
+    environment:
+      - REGISTRY_HOST=registry
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
