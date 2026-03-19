@@ -4,7 +4,7 @@ services:
     image: rabbitmq:3-management
     ports:
       - "5672:5672"   # Communication port
-      - "15672:15672" # Web UI (http://localhost:15672)
+      - "15672:15672" # Web UI
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
@@ -20,12 +20,29 @@ services:
     depends_on:
       - rabbitmq
 
-  # Peer Node 1 (You will duplicate this for node2, node3 later)
+  # Peer Node 1
   node1:
     build: .
     command: python src/node.py --id 1 --port 50052
+    ports:
+      - "50052:50052" # External:Internal
     volumes:
-      - ./node_data/node1:/app/data  # Saves data locally so it survives restarts
+      - ./node_data/node1:/app/data
+    environment:
+      - REGISTRY_HOST=registry
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # Peer Node 2 (Ready for Day 4 Replication)
+  node2:
+    build: .
+    command: python src/node.py --id 2 --port 50053
+    ports:
+      - "50053:50053"
+    volumes:
+      - ./node_data/node2:/app/data
     environment:
       - REGISTRY_HOST=registry
       - RABBITMQ_HOST=rabbitmq
