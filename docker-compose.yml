@@ -25,7 +25,7 @@ services:
     build: .
     command: python src/node.py --id 1 --port 50052
     ports:
-      - "50052:50052" # External:Internal
+      - "50052:50052"
     volumes:
       - ./node_data/node1:/app/data
     environment:
@@ -35,7 +35,7 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # Peer Node 2 (Ready for Day 4 Replication)
+  # Peer Node 2
   node2:
     build: .
     command: python src/node.py --id 2 --port 50053
@@ -43,6 +43,21 @@ services:
       - "50053:50053"
     volumes:
       - ./node_data/node2:/app/data
+    environment:
+      - REGISTRY_HOST=registry
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  # NEW: Peer Node 3 (The Scalability Test)
+  node3:
+    build: .
+    command: python src/node.py --id 3 --port 50054
+    ports:
+      - "50054:50054"
+    volumes:
+      - ./node_data/node3:/app/data
     environment:
       - REGISTRY_HOST=registry
       - RABBITMQ_HOST=rabbitmq

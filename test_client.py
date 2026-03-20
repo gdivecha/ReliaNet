@@ -13,7 +13,7 @@ def run():
     # Match your Message name
     news = relianet_pb2.DataPayload(
         key="local_news", 
-        value="Massive traffic jam reported on the 410 in Brampton."
+        value="Freezing rain causes 410 to be slippery."
     )
     
     try:
