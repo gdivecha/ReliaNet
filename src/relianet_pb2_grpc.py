@@ -5,7 +5,7 @@ import warnings
 
 import relianet_pb2 as relianet__pb2
 
-GRPC_GENERATED_VERSION = '1.70.0'
+GRPC_GENERATED_VERSION = '1.78.0'
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in relianet_pb2_grpc.py depends on'
+        + ' but the generated code in relianet_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -39,6 +39,11 @@ class RegistryStub(object):
                 request_serializer=relianet__pb2.NodeInfo.SerializeToString,
                 response_deserializer=relianet__pb2.PeerList.FromString,
                 _registered_method=True)
+        self.GetPeers = channel.unary_unary(
+                '/relianet.Registry/GetPeers',
+                request_serializer=relianet__pb2.Empty.SerializeToString,
+                response_deserializer=relianet__pb2.PeerList.FromString,
+                _registered_method=True)
 
 
 class RegistryServicer(object):
@@ -50,12 +55,23 @@ class RegistryServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetPeers(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RegistryServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'RegisterNode': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterNode,
                     request_deserializer=relianet__pb2.NodeInfo.FromString,
+                    response_serializer=relianet__pb2.PeerList.SerializeToString,
+            ),
+            'GetPeers': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPeers,
+                    request_deserializer=relianet__pb2.Empty.FromString,
                     response_serializer=relianet__pb2.PeerList.SerializeToString,
             ),
     }
@@ -85,6 +101,33 @@ class Registry(object):
             target,
             '/relianet.Registry/RegisterNode',
             relianet__pb2.NodeInfo.SerializeToString,
+            relianet__pb2.PeerList.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetPeers(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/relianet.Registry/GetPeers',
+            relianet__pb2.Empty.SerializeToString,
             relianet__pb2.PeerList.FromString,
             options,
             channel_credentials,

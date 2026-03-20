@@ -4,6 +4,7 @@ package relianet;
 
 service Registry {
   rpc RegisterNode (NodeInfo) returns (PeerList);
+  rpc GetPeers (Empty) returns (PeerList);
 }
 
 service PeerNode {
@@ -11,6 +12,7 @@ service PeerNode {
   rpc QuorumRead (ReadRequest) returns (DataPayload);
 }
 
+message Empty {}
 message NodeInfo { string ip = 1; int32 port = 2; }
 message PeerList { repeated NodeInfo peers = 1; }
 message DataPayload { string key = 1; string value = 2; }

@@ -10,9 +10,9 @@ import relianet_pb2
 import relianet_pb2_grpc
 
 class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
-    def __init__(self, node_id):
+    def __init__(self, node_id, port):
         self.node_id = node_id
-        # Define where this node will save its data (matches your docker-compose volume)
+        self.port = port 
         self.data_dir = "/app/data"
         self.db_file = os.path.join(self.data_dir, f"node_{self.node_id}_db.json")
         
@@ -36,33 +36,62 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
             json.dump(self.data_store, f, indent=4)
 
     def Replicate(self, request, context):
-        """This handles the 'Submitting news' call from your client."""
+        """Handles receiving data and propagating it to all other peers."""
         with self.lock:
+            # Prevent infinite loops: if we already have this exact key/value, just ACK
+            if request.key in self.data_store and self.data_store[request.key] == request.value:
+                return relianet_pb2.Ack(success=True)
+
             self.data_store[request.key] = request.value
             self.save_to_disk()
             
-        print(f"[NODE-{self.node_id}] Saved: [{request.key}] -> {request.value}", flush=True)
+        print(f"[NODE-{self.node_id}] Saved locally. Propagating to network...", flush=True)
+
+        # --- DAY 4 REPLICATION LOGIC ---
+        registry_host = os.environ.get("REGISTRY_HOST", "registry")
+        try:
+            with grpc.insecure_channel(f"{registry_host}:50051") as channel:
+                stub = relianet_pb2_grpc.RegistryStub(channel)
+                # Ask Registry for the 'Phonebook' using the new GetPeers RPC
+                response = stub.GetPeers(relianet_pb2.Empty())
+                
+                for peer in response.peers:
+                    # Skip yourself (don't send data back to the same node)
+                    if peer.port == self.port:
+                        continue
+                    
+                    try:
+                        # Establish connection to the neighbor node
+                        with grpc.insecure_channel(f"{peer.ip}:{peer.port}") as p_channel:
+                            p_stub = relianet_pb2_grpc.PeerNodeStub(p_channel)
+                            p_stub.Replicate(request)
+                            print(f"[NODE-{self.node_id}] Successfully replicated to {peer.ip}:{peer.port}", flush=True)
+                    except Exception as e:
+                        print(f"[NODE-{self.node_id}] Replication failed for {peer.ip}: {e}", flush=True)
+                        
+        except Exception as e:
+            print(f"[NODE-{self.node_id}] Registry discovery error: {e}", flush=True)
+
         return relianet_pb2.Ack(success=True)
 
 def register_with_registry(ip, port):
-    registry_host = os.environ.get("REGISTRY_HOST", "localhost")
-    print(f"[NODE] Contacting registry at {registry_host}:50051...", flush=True)
-    channel = grpc.insecure_channel(f"{registry_host}:50051")
-    stub = relianet_pb2_grpc.RegistryStub(channel)
-    
-    time.sleep(2) 
+    """Registers this node with the central discovery service."""
+    registry_host = os.environ.get("REGISTRY_HOST", "registry")
+    # Give the server a moment to start up before registering
+    time.sleep(3) 
     try:
-        # Note: Ensure these field names (ip, port) match your .proto exactly
+        channel = grpc.insecure_channel(f"{registry_host}:50051")
+        stub = relianet_pb2_grpc.RegistryStub(channel)
         request = relianet_pb2.NodeInfo(ip=ip, port=port)
-        response = stub.RegisterNode(request)
-        print(f"[NODE] Registered! Peers: {len(response.peers)}", flush=True)
+        stub.RegisterNode(request)
+        print(f"[NODE] Registered with Registry as {ip}:{port}", flush=True)
     except Exception as e:
-        print(f"[NODE] Registry error: {e}", flush=True)
+        print(f"[NODE] Registration failed: {e}", flush=True)
 
 def serve(node_id, port):
-    """This starts the actual gRPC server so the node can listen."""
+    """Starts the gRPC server to listen for Replicate and QuorumRead calls."""
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    relianet_pb2_grpc.add_PeerNodeServicer_to_server(PeerNodeServicer(node_id), server)
+    relianet_pb2_grpc.add_PeerNodeServicer_to_server(PeerNodeServicer(node_id, port), server)
     server.add_insecure_port(f'[::]:{port}')
     server.start()
     print(f"[NODE-{node_id}] gRPC Server listening on port {port}...", flush=True)
@@ -74,9 +103,8 @@ if __name__ == "__main__":
     parser.add_argument('--port', type=int, required=True)
     args = parser.parse_args()
 
-    # 1. Register with the phonebook
+    # Run registration in a background thread so the server can start immediately
     container_ip = f"node{args.id}"
-    register_with_registry(container_ip, args.port)
+    threading.Thread(target=register_with_registry, args=(container_ip, args.port), daemon=True).start()
     
-    # 2. Start the server (Replaces the while True: sleep)
     serve(args.id, args.port)
