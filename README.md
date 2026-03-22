@@ -1,25 +1,25 @@
 # 🌐 ReliaNet: Distributed Truth-Seeking Network
 **COE 892 - Distributed Systems Project**
 
-ReliaNet is a containerized, distributed system designed to store and verify "News" data across a peer-to-peer network. It utilizes **gRPC** for synchronous communication, **RabbitMQ** for asynchronous verification, and **Docker** for environment parity across Mac, Windows, and Linux.
+ReliaNet is a fault-tolerant, self-healing distributed database designed to store and verify "News" data across a peer-to-peer network. It features **Quorum Consensus** for data consistency and an **API Gateway** for modern web integration.
 
 ---
 
 ## 🏗 Project Architecture
 
-The system consists of three main components:
-1.  **The Registry:** A central discovery service that tracks all active peer nodes.
-2.  **Peer Nodes:** Individual servers that store data in a thread-safe memory cache and persist it to a local JSON database (Write-Ahead Logging).
-3.  **The RabbitMQ Broker:** Handles background tasks for data integrity and hash verification.
+The system consists of five main layers:
+1.  **FastAPI Gateway:** A modern REST API that translates HTTP traffic into gRPC commands for the cluster.
+2.  **The Registry:** A central gRPC discovery service that tracks all active peer nodes.
+3.  **Peer Nodes:** Servers that store data in a thread-safe memory cache and persist it to local JSON databases.
+4.  **RabbitMQ Auditor:** An asynchronous "immune system" that detects data mismatches (hash-based) and automatically repairs out-of-sync nodes.
+5.  **Quorum Engine:** A majority-voting system that ensures the most recent "truth" is served even if nodes are offline.
 
 ---
 
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
-Ensure you have the following installed:
 * **Docker & Docker Compose**
-* **Python 3.10+** (For local testing)
 * **Git**
 
 ### 2. Installation
@@ -36,36 +36,34 @@ docker-compose up --build
 
 ---
 
-## 🧪 Testing the Network
-
-Since the nodes run inside a private Docker network, we use a temporary "Injector" container to send data to the nodes.
-
-### Step 1: Run the Injection Command
-Run this command from your terminal to launch a temporary container that executes the `test_client.py` script within the `relianet_default` network.
-
-```bash
-docker run --rm -it \
-  --network relianet_default \
-  -v "$(pwd):/app" \
-  -w /app \
-  -e PYTHONPATH="/app/src" \
-  python:3.10-slim \
-  sh -c "pip install grpcio grpcio-tools && python test_client.py"
-```
+## 🎮 Interactive Demo (The Web UI)
+Once the cluster is running, you can interact with the network directly through your browser—no terminal commands required.
+1. Open the API Dashboard: http://localhost:8000/docs
+2. Write Data (POST): Use the `/api/news` endpoint to replicate a news string across all nodes.
+3. Read Data (GET): Use the `/api/news` endpoint to trigger a Quorum Read. Node 1 will poll its peers, reach a majority consensus, and return the verified value.
 
 ---
 
-## 📂 Data Persistence & Verification
+## 🧪 Fault Tolerance & Recovery
 
-### Local Storage
-Each node maps a folder on your host machine to its internal database. You can verify the data was saved locally:
-- `node_data/node1/node_1_db.json`
-- `node_data/node2/node_2_db.json`
+### Testing the "Immune System"
+ReliaNet is designed to heal itself automatically:
+1. Kill a Node: `docker-compose stop node2`
+2. Update Data: Use the API (or `test_client.py`) to write new data while Node 2 is dead.
+3. Restart & Heal: `docker-compose start node2`
+4. Watch the Logs: Within 10-15 seconds, you will see Node 1 or 3 detect the mismatch via RabbitMQ and "push" the missing data to Node 2:
+`⚠️ [NODE-1 AUDIT] Mismatch with Node 2! Sending missing data...`
 
-### Recovery Test
-To prove the system survives crashes:
-1. Stop the containers: `docker-compose stop`
-2. Start them again: `docker-compose up`
-3. Check the logs for: `[NODE-1] Recovered X items from disk.`
+### Testing the Quorum Read
+Even if one node is down, the system remains highly available. The QuorumRead logic will still return the correct data as long as a majority (N/2 + 1) of nodes are healthy.
+
+---
+
+## 📂 Project Structure
+- `proto/`: Contains the gRPC service definitions (`relianet.proto`).
+- `src/node.py`: The core peer logic, including Quorum voting and RabbitMQ auditing.
+- `src/gateway.py`: The FastAPI server providing the REST interface.
+- `node_data/`: Persistent JSON storage for each individual node.
+- `test_client.py`: A raw gRPC Python client for internal network testing.
 
 ---

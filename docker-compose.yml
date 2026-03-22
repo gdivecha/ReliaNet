@@ -50,7 +50,7 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # NEW: Peer Node 3 (The Scalability Test)
+  # Peer Node 3 (The Scalability Test)
   node3:
     build: .
     command: python src/node.py --id 3 --port 50054
@@ -64,3 +64,19 @@ services:
     depends_on:
       rabbitmq:
         condition: service_healthy
+
+  # --- DAY 7: The FastAPI Web Gateway ---
+  gateway:
+    build: .
+    container_name: relianet-gateway
+    environment:
+      - PYTHONPATH=/app/src
+    command: uvicorn gateway:app --host 0.0.0.0 --port 5000 --app-dir /app/src
+    ports:
+      - "8000:5000"  # <--- CHANGE THIS LINE (Mac Port 8000 -> Container Port 5000)
+    volumes:
+      - .:/app
+    depends_on:
+      - node1
+      - node2
+      - node3
