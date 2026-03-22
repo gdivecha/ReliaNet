@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0erelianet.proto\x12\x08relianet\"\x07\n\x05\x45mpty\"$\n\x08NodeInfo\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\"-\n\x08PeerList\x12!\n\x05peers\x18\x01 \x03(\x0b\x32\x12.relianet.NodeInfo\")\n\x0b\x44\x61taPayload\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\x1a\n\x0bReadRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"\x16\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\x32s\n\x08Registry\x12\x36\n\x0cRegisterNode\x12\x12.relianet.NodeInfo\x1a\x12.relianet.PeerList\x12/\n\x08GetPeers\x12\x0f.relianet.Empty\x1a\x12.relianet.PeerList2y\n\x08PeerNode\x12\x31\n\tReplicate\x12\x15.relianet.DataPayload\x1a\r.relianet.Ack\x12:\n\nQuorumRead\x12\x15.relianet.ReadRequest\x1a\x15.relianet.DataPayloadb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0erelianet.proto\x12\x08relianet\"\x07\n\x05\x45mpty\"$\n\x08NodeInfo\x12\n\n\x02ip\x18\x01 \x01(\t\x12\x0c\n\x04port\x18\x02 \x01(\x05\"-\n\x08PeerList\x12!\n\x05peers\x18\x01 \x03(\x0b\x32\x12.relianet.NodeInfo\")\n\x0b\x44\x61taPayload\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t\"\x1a\n\x0bReadRequest\x12\x0b\n\x03key\x18\x01 \x01(\t\"\x16\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\",\n\x0cReadResponse\x12\r\n\x05value\x18\x01 \x01(\t\x12\r\n\x05\x66ound\x18\x02 \x01(\x08\x32n\n\x08Registry\x12\x31\n\x0cRegisterNode\x12\x12.relianet.NodeInfo\x1a\r.relianet.Ack\x12/\n\x08GetPeers\x12\x0f.relianet.Empty\x1a\x12.relianet.PeerList2\xb6\x01\n\x08PeerNode\x12\x31\n\tReplicate\x12\x15.relianet.DataPayload\x1a\r.relianet.Ack\x12;\n\nQuorumRead\x12\x15.relianet.ReadRequest\x1a\x16.relianet.ReadResponse\x12:\n\tLocalRead\x12\x15.relianet.ReadRequest\x1a\x16.relianet.ReadResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -43,8 +43,10 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_READREQUEST']._serialized_end=191
   _globals['_ACK']._serialized_start=193
   _globals['_ACK']._serialized_end=215
-  _globals['_REGISTRY']._serialized_start=217
-  _globals['_REGISTRY']._serialized_end=332
-  _globals['_PEERNODE']._serialized_start=334
-  _globals['_PEERNODE']._serialized_end=455
+  _globals['_READRESPONSE']._serialized_start=217
+  _globals['_READRESPONSE']._serialized_end=261
+  _globals['_REGISTRY']._serialized_start=263
+  _globals['_REGISTRY']._serialized_end=373
+  _globals['_PEERNODE']._serialized_start=376
+  _globals['_PEERNODE']._serialized_end=558
 # @@protoc_insertion_point(module_scope)

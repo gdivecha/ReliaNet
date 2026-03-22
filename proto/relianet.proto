@@ -3,18 +3,41 @@ syntax = "proto3";
 package relianet;
 
 service Registry {
-  rpc RegisterNode (NodeInfo) returns (PeerList);
+  rpc RegisterNode (NodeInfo) returns (Ack);
   rpc GetPeers (Empty) returns (PeerList);
 }
 
 service PeerNode {
   rpc Replicate (DataPayload) returns (Ack);
-  rpc QuorumRead (ReadRequest) returns (DataPayload);
+  rpc QuorumRead (ReadRequest) returns (ReadResponse); // Client calls this
+  rpc LocalRead (ReadRequest) returns (ReadResponse);  // Nodes call each other with this
 }
 
 message Empty {}
-message NodeInfo { string ip = 1; int32 port = 2; }
-message PeerList { repeated NodeInfo peers = 1; }
-message DataPayload { string key = 1; string value = 2; }
-message ReadRequest { string key = 1; }
-message Ack { bool success = 1; }
+
+message NodeInfo { 
+  string ip = 1; 
+  int32 port = 2; 
+}
+
+message PeerList { 
+  repeated NodeInfo peers = 1; 
+}
+
+message DataPayload { 
+  string key = 1; 
+  string value = 2; 
+}
+
+message ReadRequest { 
+  string key = 1; 
+}
+
+message Ack { 
+  bool success = 1; 
+}
+
+message ReadResponse {
+  string value = 1;
+  bool found = 2;
+}

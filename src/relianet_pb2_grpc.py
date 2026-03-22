@@ -37,7 +37,7 @@ class RegistryStub(object):
         self.RegisterNode = channel.unary_unary(
                 '/relianet.Registry/RegisterNode',
                 request_serializer=relianet__pb2.NodeInfo.SerializeToString,
-                response_deserializer=relianet__pb2.PeerList.FromString,
+                response_deserializer=relianet__pb2.Ack.FromString,
                 _registered_method=True)
         self.GetPeers = channel.unary_unary(
                 '/relianet.Registry/GetPeers',
@@ -67,7 +67,7 @@ def add_RegistryServicer_to_server(servicer, server):
             'RegisterNode': grpc.unary_unary_rpc_method_handler(
                     servicer.RegisterNode,
                     request_deserializer=relianet__pb2.NodeInfo.FromString,
-                    response_serializer=relianet__pb2.PeerList.SerializeToString,
+                    response_serializer=relianet__pb2.Ack.SerializeToString,
             ),
             'GetPeers': grpc.unary_unary_rpc_method_handler(
                     servicer.GetPeers,
@@ -101,7 +101,7 @@ class Registry(object):
             target,
             '/relianet.Registry/RegisterNode',
             relianet__pb2.NodeInfo.SerializeToString,
-            relianet__pb2.PeerList.FromString,
+            relianet__pb2.Ack.FromString,
             options,
             channel_credentials,
             insecure,
@@ -157,7 +157,12 @@ class PeerNodeStub(object):
         self.QuorumRead = channel.unary_unary(
                 '/relianet.PeerNode/QuorumRead',
                 request_serializer=relianet__pb2.ReadRequest.SerializeToString,
-                response_deserializer=relianet__pb2.DataPayload.FromString,
+                response_deserializer=relianet__pb2.ReadResponse.FromString,
+                _registered_method=True)
+        self.LocalRead = channel.unary_unary(
+                '/relianet.PeerNode/LocalRead',
+                request_serializer=relianet__pb2.ReadRequest.SerializeToString,
+                response_deserializer=relianet__pb2.ReadResponse.FromString,
                 _registered_method=True)
 
 
@@ -171,7 +176,15 @@ class PeerNodeServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def QuorumRead(self, request, context):
-        """Missing associated documentation comment in .proto file."""
+        """Client calls this
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def LocalRead(self, request, context):
+        """Nodes call each other with this
+        """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
@@ -187,7 +200,12 @@ def add_PeerNodeServicer_to_server(servicer, server):
             'QuorumRead': grpc.unary_unary_rpc_method_handler(
                     servicer.QuorumRead,
                     request_deserializer=relianet__pb2.ReadRequest.FromString,
-                    response_serializer=relianet__pb2.DataPayload.SerializeToString,
+                    response_serializer=relianet__pb2.ReadResponse.SerializeToString,
+            ),
+            'LocalRead': grpc.unary_unary_rpc_method_handler(
+                    servicer.LocalRead,
+                    request_deserializer=relianet__pb2.ReadRequest.FromString,
+                    response_serializer=relianet__pb2.ReadResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -243,7 +261,34 @@ class PeerNode(object):
             target,
             '/relianet.PeerNode/QuorumRead',
             relianet__pb2.ReadRequest.SerializeToString,
-            relianet__pb2.DataPayload.FromString,
+            relianet__pb2.ReadResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def LocalRead(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/relianet.PeerNode/LocalRead',
+            relianet__pb2.ReadRequest.SerializeToString,
+            relianet__pb2.ReadResponse.FromString,
             options,
             channel_credentials,
             insecure,

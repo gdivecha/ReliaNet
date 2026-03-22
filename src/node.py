@@ -7,6 +7,7 @@ import threading
 import hashlib
 import pika
 from concurrent import futures
+from collections import Counter  # <-- DAY 6 IMPORT
 
 import relianet_pb2
 import relianet_pb2_grpc
@@ -74,6 +75,60 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
             pass
 
         return relianet_pb2.Ack(success=True)
+
+    # --- DAY 6: Local Read (Quietly checks database) ---
+    def LocalRead(self, request, context):
+        """Returns the node's local database value without asking anyone else."""
+        with self.lock:
+            val = self.data_store.get(request.key, "")
+            found = request.key in self.data_store
+            return relianet_pb2.ReadResponse(value=val, found=found)
+
+    # --- DAY 6: Quorum Read (Acts as coordinator) ---
+    def QuorumRead(self, request, context):
+        """Acts as coordinator: asks all peers for their value and returns the majority consensus."""
+        key = request.key
+        collected_values = []
+        
+        # 1. Check local database first
+        with self.lock:
+            if key in self.data_store:
+                collected_values.append(self.data_store[key])
+                
+        print(f"[NODE-{self.node_id}] QuorumRead started for key '{key}'. Checking peers...", flush=True)
+
+        # 2. Ask all peers via LocalRead
+        registry_host = os.environ.get("REGISTRY_HOST", "registry")
+        try:
+            with grpc.insecure_channel(f"{registry_host}:50051") as channel:
+                stub = relianet_pb2_grpc.RegistryStub(channel)
+                response = stub.GetPeers(relianet_pb2.Empty())
+                
+                for peer in response.peers:
+                    if peer.port == self.port:
+                        continue
+                        
+                    try:
+                        with grpc.insecure_channel(f"{peer.ip}:{peer.port}") as p_channel:
+                            p_stub = relianet_pb2_grpc.PeerNodeStub(p_channel)
+                            read_resp = p_stub.LocalRead(request)
+                            if read_resp.found:
+                                collected_values.append(read_resp.value)
+                    except Exception as e:
+                        print(f"[NODE-{self.node_id}] Failed to read from {peer.ip}: {e}", flush=True)
+        except Exception as e:
+            print(f"[NODE-{self.node_id}] Registry error during QuorumRead: {e}", flush=True)
+
+        # 3. Determine the Majority (Quorum)
+        if not collected_values:
+            return relianet_pb2.ReadResponse(value="", found=False)
+            
+        vote_counts = Counter(collected_values)
+        winning_value, votes = vote_counts.most_common(1)[0]
+        
+        print(f"[NODE-{self.node_id}] Quorum reached! Value '{winning_value}' won with {votes} votes.", flush=True)
+        
+        return relianet_pb2.ReadResponse(value=winning_value, found=True)
 
     # --- DAY 5 FIX: The Catch-Up Push ---
     def push_all_data_to_peer(self, peer_host, peer_port):
