@@ -72,6 +72,12 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
         return relianet_pb2.Ack(success=True)
 
     def LocalRead(self, request, context):
+        # --- 🐌 TAIL LATENCY TEST ---
+        # Simulate Node 3 being on a slow network link
+        if str(self.node_id) == "3":
+            print(f"[NODE-3] 🐌 Simulating heavy network lag (3s delay)...", flush=True)
+            time.sleep(3)
+
         with self.lock:
             val = self.data_store.get(request.key, "")
             found = request.key in self.data_store
@@ -89,7 +95,6 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
         registry_host = os.environ.get("REGISTRY_HOST", "registry")
         total_cluster_size = 1 
         
-        # 1. Ask Registry exactly how many nodes exist right now
         try:
             with grpc.insecure_channel(f"{registry_host}:50051") as channel:
                 stub = relianet_pb2_grpc.RegistryStub(channel)
@@ -101,15 +106,21 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
                     try:
                         with grpc.insecure_channel(f"{peer.ip}:{peer.port}") as p_channel:
                             p_stub = relianet_pb2_grpc.PeerNodeStub(p_channel)
-                            read_resp = p_stub.LocalRead(request)
+                            
+                            # 🚀 LATENCY RESILIENCE: 1.5s Deadline
+                            # If a peer takes longer than 1.5s (like Node 3), we move on.
+                            read_resp = p_stub.LocalRead(request, timeout=1.5)
+                            
                             if read_resp.found:
                                 collected_values.append(read_resp.value)
-                    except Exception: pass
+                    except grpc.RpcError:
+                        print(f"⚠️ [QUORUM] A peer (likely Node 3) was too slow. Moving on...", flush=True)
+                    except Exception: 
+                        pass
         except Exception: pass
 
-        # 2. Dynamic Math: (Total // 2) + 1
         threshold = (total_cluster_size // 2) + 1
-        print(f"⚖️ [QUORUM] Cluster Size: {total_cluster_size} | Required Votes: {threshold}", flush=True)
+        print(f"⚖️ [QUORUM] Size: {total_cluster_size} | Required: {threshold} | Collected: {len(collected_values)}", flush=True)
 
         if not collected_values:
             return relianet_pb2.ReadResponse(value="", found=False)
@@ -131,8 +142,8 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
             with grpc.insecure_channel(f"{peer_host}:{peer_port}") as channel:
                 stub = relianet_pb2_grpc.PeerNodeStub(channel)
                 for key, value in items_to_send:
-                    # Reuse WriteRequest/DataPayload based on your proto setup
-                    stub.Replicate(relianet_pb2.DataPayload(key=key, value=value) if hasattr(relianet_pb2, 'DataPayload') else relianet_pb2.WriteRequest(key=key, value=value))
+                    msg = relianet_pb2.DataPayload(key=key, value=value) if hasattr(relianet_pb2, 'DataPayload') else relianet_pb2.WriteRequest(key=key, value=value)
+                    stub.Replicate(msg)
             print(f"🛠️ [NODE-{self.node_id}] Synced missing data to {peer_host}:{peer_port}", flush=True)
         except Exception: pass
 
@@ -149,7 +160,6 @@ def register_with_registry(ip, port):
         except Exception: time.sleep(2)
 
 
-# --- ELASTIC RABBITMQ LOGIC ---
 def rabbitmq_heartbeat(node_id, servicer):
     rabbitmq_host = os.environ.get("RABBITMQ_HOST", "rabbitmq")
     time.sleep(8) 
@@ -159,7 +169,6 @@ def rabbitmq_heartbeat(node_id, servicer):
             channel = connection.channel()
             channel.exchange_declare(exchange='node_heartbeats', exchange_type='fanout')
             while True:
-                # Include the exact port in the heartbeat so peers don't guess!
                 message = json.dumps({"node_id": node_id, "hash": servicer.get_data_hash(), "port": servicer.port})
                 channel.basic_publish(exchange='node_heartbeats', routing_key='', body=message)
                 time.sleep(10)
@@ -180,9 +189,7 @@ def rabbitmq_auditor(node_id, servicer):
                 message = json.loads(body)
                 peer_id = message.get("node_id")
                 peer_port = message.get("port")
-                
                 if str(peer_id) == str(node_id): return
-                    
                 if message.get("hash") != servicer.get_data_hash():
                     print(f"⚠️ [NODE-{node_id} AUDIT] Mismatch with Node {peer_id}! Healing...", flush=True)
                     servicer.push_all_data_to_peer(f"node{peer_id}", peer_port)
@@ -197,7 +204,6 @@ def serve(node_id, port):
     relianet_pb2_grpc.add_PeerNodeServicer_to_server(servicer, server)
     server.add_insecure_port(f'[::]:{port}')
     server.start()
-    
     threading.Thread(target=rabbitmq_heartbeat, args=(node_id, servicer), daemon=True).start()
     threading.Thread(target=rabbitmq_auditor, args=(node_id, servicer), daemon=True).start()
     server.wait_for_termination()
