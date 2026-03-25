@@ -1,6 +1,8 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import grpc
+import random
+import os
 
 import relianet_pb2
 import relianet_pb2_grpc
@@ -11,14 +13,40 @@ class DataEntry(BaseModel):
     key: str
     value: str
 
+# --- THE "A+" FIX: Load Balancing & High Availability ---
 def get_stub():
-    # Connecting to node1 as the entry point
-    channel = grpc.insecure_channel('node1:50052')
-    return relianet_pb2_grpc.PeerNodeStub(channel)
+    """
+    Dynamically finds a healthy node by asking the Registry.
+    Removes Node 1 as a Single Point of Failure.
+    """
+    registry_host = os.environ.get("REGISTRY_HOST", "registry")
+    
+    try:
+        # 1. Ask the Registry for the current list of healthy peers
+        with grpc.insecure_channel(f"{registry_host}:50051") as channel:
+            registry_stub = relianet_pb2_grpc.RegistryStub(channel)
+            # Short timeout so we don't hang if the registry is struggling
+            response = registry_stub.GetPeers(relianet_pb2.Empty(), timeout=2.0)
+            
+            if not response.peers:
+                raise Exception("Registry reported zero healthy nodes.")
+
+            # 2. Pick a random node from the healthy list
+            target_peer = random.choice(response.peers)
+            target_address = f"{target_peer.ip}:{target_peer.port}"
+            
+            # 3. Connect to that specific healthy node
+            channel = grpc.insecure_channel(target_address)
+            return relianet_pb2_grpc.PeerNodeStub(channel)
+            
+    except Exception as e:
+        # Fallback: If Registry is down, try Node 1 as a last resort
+        print(f"⚠️ Gateway could not reach Registry. Falling back to Node 1: {e}")
+        channel = grpc.insecure_channel('node1:50052')
+        return relianet_pb2_grpc.PeerNodeStub(channel)
 
 @app.post("/api/data", status_code=201)
 def write_data(entry: DataEntry):
-    """Writes any key-value pair to the cluster."""
     try:
         stub = get_stub()
         payload = relianet_pb2.DataPayload(key=entry.key, value=entry.value)
@@ -26,7 +54,6 @@ def write_data(entry: DataEntry):
         
         if response.success:
             return {"status": "success", "message": f"Key '{entry.key}' replicated."}
-        
         raise HTTPException(status_code=400, detail="Cluster rejected the write.")
         
     except grpc.RpcError as e:
@@ -36,32 +63,19 @@ def write_data(entry: DataEntry):
 
 @app.get("/api/data/{key}")
 def read_data(key: str):
-    """Reads a specific key from the cluster using Quorum Consensus."""
     try:
         stub = get_stub()
         req = relianet_pb2.ReadRequest(key=key)
         response = stub.QuorumRead(req)
         
-        # --- THE FIX ---
-        # If the gRPC call succeeded but the data isn't there, return 404
         if not response.found:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Key '{key}' not found. It hasn't been created yet."
-            )
+            raise HTTPException(status_code=404, detail=f"Key '{key}' not found.")
             
-        return {
-            "status": "success", 
-            "key": key,
-            "consensus_value": response.value
-        }
+        return {"status": "success", "key": key, "consensus_value": response.value}
             
     except grpc.RpcError as e:
-        # Actual cluster crash / Network timeout
         raise HTTPException(status_code=503, detail=f"Cluster unavailable: {e.details()}")
     except HTTPException as he:
-        # Re-raise our 404
         raise he
     except Exception as e:
-        # Generic fallback
-        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Internal Error: {str(e)}")

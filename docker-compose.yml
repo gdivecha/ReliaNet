@@ -65,35 +65,35 @@ services:
       rabbitmq:
         condition: service_healthy
 
-  # # Peer Node 4 (Elasticity Test)
-  # node4:
-  #   build: .
-  #   command: python src/node.py --id 4 --port 50055
-  #   ports:
-  #     - "50055:50055"
-  #   volumes:
-  #     - ./node_data/node4:/app/data
-  #   environment:
-  #     - REGISTRY_HOST=registry
-  #     - RABBITMQ_HOST=rabbitmq
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
+  # Peer Node 4 (Elasticity Test)
+  node4:
+    build: .
+    command: python src/node.py --id 4 --port 50055
+    ports:
+      - "50055:50055"
+    volumes:
+      - ./node_data/node4:/app/data
+    environment:
+      - REGISTRY_HOST=registry
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
-  # # Peer Node 5 (Elasticity Test)
-  # node5:
-  #   build: .
-  #   command: python src/node.py --id 5 --port 50056
-  #   ports:
-  #     - "50056:50056"
-  #   volumes:
-  #     - ./node_data/node5:/app/data
-  #   environment:
-  #     - REGISTRY_HOST=registry
-  #     - RABBITMQ_HOST=rabbitmq
-  #   depends_on:
-  #     rabbitmq:
-  #       condition: service_healthy
+  # Peer Node 5 (Elasticity Test)
+  node5:
+    build: .
+    command: python src/node.py --id 5 --port 50056
+    ports:
+      - "50056:50056"
+    volumes:
+      - ./node_data/node5:/app/data
+    environment:
+      - REGISTRY_HOST=registry
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
 
   # --- DAY 7: The FastAPI Web Gateway ---
   gateway:
@@ -110,5 +110,18 @@ services:
       - node1
       - node2
       - node3
-      # - node4
-      # - node5
+      - node4
+      - node5
+  
+  ui:
+    build: .
+    container_name: relianet-ui
+    command: python -m streamlit run src/ui.py --server.port=8501 --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - GATEWAY_URL=http://gateway:5000
+    volumes:
+      - .:/app
+    depends_on:
+      - gateway
