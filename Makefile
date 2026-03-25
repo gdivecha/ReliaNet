@@ -27,3 +27,15 @@ stop3:
 # Shortcut to activate node 3
 start3:
 	docker-compose start node3
+
+# Shortcut to clear corrupted docker cache
+prune:
+	docker builder prune -a -f
+
+# Shortcut to deactivate nodes 4 and 5
+stop4and5:
+	docker-compose stop node4 node5
+
+# Shortcut to activate nodes 4 and 5
+start4and5:
+	docker-compose start node4 node5
