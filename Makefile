@@ -16,7 +16,7 @@ down:
 logs:
 	docker-compose logs -f
 
-# Shotrcut to remove local storage
+# Shortcut to remove local storage
 discard:
 	rm -rf node_data/node*/*
 

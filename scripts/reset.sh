@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "🧹 Wiping distributed databases and stopping containers..."
+echo "🧹 Wiping distributed databases and stopping containers"
 docker-compose down -v --remove-orphans
 
 echo "🗑️ Clearing local JSON storage..."

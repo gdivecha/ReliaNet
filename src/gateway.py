@@ -13,7 +13,6 @@ class DataEntry(BaseModel):
     key: str
     value: str
 
-# --- THE "A+" FIX: Load Balancing & High Availability ---
 def get_stub():
     """
     Dynamically finds a healthy node by asking the Registry.

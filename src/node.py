@@ -72,7 +72,7 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
         return relianet_pb2.Ack(success=True)
 
     def LocalRead(self, request, context):
-        # --- 🐌 TAIL LATENCY TEST ---
+        # TAIL LATENCY TEST
         # Simulate Node 3 being on a slow network link
         if str(self.node_id) == "3":
             print(f"[NODE-3] 🐌 Simulating heavy network lag (3s delay)...", flush=True)
@@ -83,7 +83,7 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
             found = request.key in self.data_store
             return relianet_pb2.ReadResponse(value=val, found=found)
 
-    # --- ELASTIC QUORUM READ ---
+    # ELASTIC QUORUM READ
     def QuorumRead(self, request, context):
         key = request.key
         collected_values = []
@@ -107,7 +107,7 @@ class PeerNodeServicer(relianet_pb2_grpc.PeerNodeServicer):
                         with grpc.insecure_channel(f"{peer.ip}:{peer.port}") as p_channel:
                             p_stub = relianet_pb2_grpc.PeerNodeStub(p_channel)
                             
-                            # 🚀 LATENCY RESILIENCE: 1.5s Deadline
+                            # LATENCY RESILIENCE: 1.5s Deadline
                             # If a peer takes longer than 1.5s (like Node 3), we move on.
                             read_resp = p_stub.LocalRead(request, timeout=1.5)
                             
